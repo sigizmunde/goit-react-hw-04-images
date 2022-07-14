@@ -6,87 +6,83 @@ import ImageGallery from './ImageGallery/ImageGallery';
 import Loader from './Loader/Loader';
 import Modal from './Modal/Modal';
 import Button from './Button/Button';
+import { useState, useRef, useEffect } from 'react';
 
-export class App extends React.Component {
-  state = {
-    query: '',
-    items: [],
-    page: 1,
-    status: 'idle',
-    currentImage: '',
-  };
+function usePreviousValue(value) {
+  const ref = useRef();
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref.current;
+}
 
-  componentDidUpdate(_, prevState) {
-    const { query, page, items } = this.state;
-    if (query !== prevState.query || page !== prevState.page) {
-      this.setState({ status: 'loading' });
+export const App = () => {
+  const [query, setQuery] = useState('');
+  const [items, setItems] = useState([]);
+  const [page, setPage] = useState(0);
+  const [status, setStatus] = useState('idle');
+  const [currentImage, setCurrentImage] = useState('');
 
-      fetchImages(query, page)
-        .then(newItems => {
-          this.setState(({ items }) => ({
-            items: [...items, ...newItems],
-          }));
-        })
-        .finally(() => {
-          this.setState({ status: 'idle' });
-        });
-    }
+  const prevItems = usePreviousValue(items);
 
-    if (items !== prevState.items && page !== 1) {
+  useEffect(() => {
+    if (!page) return;
+    setStatus('loading');
+    fetchImages(query, page)
+      .then(newItems => {
+        setItems(items => [...items, ...newItems]);
+      })
+      .finally(() => {
+        setStatus('idle');
+      });
+  }, [query, page]);
+
+  useEffect(() => {
+    console.log(prevItems, items);
+    if (prevItems !== items && page !== 1) {
       window.scrollTo({
-        left: 0,
         top: document.body.scrollHeight,
         behavior: 'smooth',
       });
     }
-  }
+  }, [items, page, prevItems]);
 
-  handleSearch = query => {
-    this.setState({ query, page: 1, items: [] });
+  const handleSearch = query => {
+    setQuery(query);
+    setPage(1);
+    setItems([]);
   };
 
-  loadMore = () => {
-    this.setState(({ page }) => ({ page: page + 1 }));
+  const loadMore = () => {
+    setPage(page => page + 1);
   };
 
-  previewClickHandle = ({ image }) => {
-    this.setState({ currentImage: image, status: 'modal' });
+  const previewClickHandle = ({ image }) => {
+    setCurrentImage(image);
+    setStatus('modal');
   };
 
-  modalCloseHandle = () => {
-    this.setState({ status: 'idle' });
+  const modalCloseHandle = () => {
+    setStatus('idle');
   };
 
-  render() {
-    const { items, status, currentImage } = this.state;
-    return (
-      <div
-        className={css.App}
-        // style={{
-        //   height: '100vh',
-        //   display: 'flex',
-        //   justifyContent: 'center',
-        //   alignItems: 'center',
-        //   fontSize: 40,
-        //   color: '#010101',
-        // }}
-      >
-        <Searchbar onSearch={this.handleSearch} />
-        {status === 'loading' && <Loader />}
-        {items.length > 0 && (
-          <>
-            <ImageGallery items={items} onClick={this.previewClickHandle} />
-            <Button onClick={this.loadMore} />
-          </>
-        )}
-        {status === 'modal' && (
-          <Modal
-            closeFunction={this.modalCloseHandle}
-            imageURL={currentImage.imageURL}
-            tags={currentImage.tags}
-          />
-        )}
-      </div>
-    );
-  }
-}
+  return (
+    <div className={css.App}>
+      <Searchbar onSearch={handleSearch} />
+      {status === 'loading' && <Loader />}
+      {items.length > 0 && (
+        <>
+          <ImageGallery items={items} onClick={previewClickHandle} />
+          <Button onClick={loadMore} />
+        </>
+      )}
+      {status === 'modal' && (
+        <Modal
+          closeFunction={modalCloseHandle}
+          imageURL={currentImage.imageURL}
+          tags={currentImage.tags}
+        />
+      )}
+    </div>
+  );
+};
